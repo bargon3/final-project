@@ -1,0 +1,15 @@
+C:\Users\user\Desktop\winform multithread\winform multithread\bin\Debug\winform multithread.exe
+C:\Users\user\Desktop\winform multithread\winform multithread\bin\Debug\winform multithread.pdb
+C:\Users\user\Desktop\winform multithread\winform multithread\obj\x86\Debug\winform_multithread.Form1.resources
+C:\Users\user\Desktop\winform multithread\winform multithread\obj\x86\Debug\winform_multithread.Properties.Resources.resources
+C:\Users\user\Desktop\winform multithread\winform multithread\obj\x86\Debug\winform multithread.csproj.GenerateResource.Cache
+C:\Users\user\Desktop\winform multithread\winform multithread\obj\x86\Debug\winform multithread.exe
+C:\Users\user\Desktop\winform multithread\winform multithread\obj\x86\Debug\winform multithread.pdb
+C:\Users\Noam\Desktop\winform multithread\winform multithread\bin\Debug\winform multithread.exe
+C:\Users\Noam\Desktop\winform multithread\winform multithread\bin\Debug\winform multithread.pdb
+C:\Users\Noam\Desktop\winform multithread\winform multithread\obj\x86\Debug\winform multithread.csprojAssemblyReference.cache
+C:\Users\Noam\Desktop\winform multithread\winform multithread\obj\x86\Debug\winform_multithread.Form1.resources
+C:\Users\Noam\Desktop\winform multithread\winform multithread\obj\x86\Debug\winform_multithread.Properties.Resources.resources
+C:\Users\Noam\Desktop\winform multithread\winform multithread\obj\x86\Debug\winform multithread.csproj.GenerateResource.cache
+C:\Users\Noam\Desktop\winform multithread\winform multithread\obj\x86\Debug\winform multithread.exe
+C:\Users\Noam\Desktop\winform multithread\winform multithread\obj\x86\Debug\winform multithread.pdb
