@@ -67,8 +67,11 @@ class server:
         self.level_ques_num=2
         self.cur_test=0
         self.can_next=False
-        self.Right_answers= {':which year did WW2 start?' :'1939', ':which year did Israel declared?':'1948',':Rome was founded in the year ___ ?':'753 BC',':The Eiffel Tower is built in ________?':'1889'}
-                             
+        # dictionaries of the questions and their right answer (from the options)
+        self.Right_answers= {':which year did WW2 start?' :'1939', ':which year did Israel declared?':'1948', ':Rome was founded in the year ___ ?':'753 BC', ':The Eiffel Tower is built in ________?':'1889'}
+        self.Hints= {':which year did WW2 start?' :'the war occured 6 years', ':which year did Israel declared?':'Israel is 71 years old according to 2019, so count yourself :)',
+                     ':Rome was founded in the year ___ ?':'guess:753 BC or 622 BC',':The Eiffel Tower is built in ________?':'This tower was build in honor of the Paris 100th World Exhibition of the French Revolution.'}
+        # list that every objec of it concludes a list of questins and answers
         self.History_test_1=[ [':which year did WW2 start?','1935','1917','1939','1945'], [':which year did Israel declared?','1946','1948','1956','1962'], ['2'],
          [':Rome was founded in the year ___ ?','753 BC','622 BC','413','928 BC'], [':The Eiffel Tower is built in ________?','1798','1889','1818','1876'] ]
 
@@ -76,8 +79,8 @@ class server:
         self.run()
 
     def check_answer(self,clientsock, question, ans, ques_index):
-
-        if str(ans) not in self.History_test_1[ques_index]:
+        
+        if ans not in self.History_test_1[ques_index]:
             print len(ans)
             print 'ans-problem', self.History_test_1[ques_index]
             msg= "you have to choose one of the shown answers... believe me one of them is right :)"
@@ -86,7 +89,7 @@ class server:
         else:
             self.can_next= True
             right_answer= self.Right_answers[question[1:]]
-            if right_answer in ans:
+            if right_answer == ans:
                 msg='Right'
             else:
                 msg='Wrong'
@@ -106,9 +109,11 @@ class server:
    
     
                     data=rlist[0].recv(self.bufSize)
+                    data=data.strip()
                     print (data)
    
-                    if "SubjHistory" in data:
+                    if "SubjHistory" == data:
+                        
                         question_answers=self.History_test_1[0]
                         msg= 'History-Level1-1-'+"-".join(question_answers)
                         clientsock.send(msg)
@@ -120,7 +125,16 @@ class server:
                         #time_check(data)
                         
 
-                    elif '40-seconds-error' in data:
+                    elif 'yes hint' in data:
+                        
+                        data=data.split("-")
+                        question= data[2]
+                        question= question[1:]
+                        msg='givenhint-'+ self.Hints[question]
+                        clientsock.send(msg)
+                    
+                    elif 'time-end-error' == data:
+                        
                         msg='bye'
                         clientsock.send(msg)
                         print "I had to end communication with ",addr
