@@ -17,6 +17,7 @@ import math
 import select
 
 
+
 #gets the ip adress of the computer
 def getIp():
     
@@ -42,7 +43,7 @@ def get_open_port():
 #saving the free port for the communication in a file
 def save_free_port():
 
-        os.chdir('C:')
+        #os.chdir('C:')
         f = open(r"getport.txt", "w")
         f.write(str(port))
 
@@ -62,27 +63,38 @@ class server:
         self.addr= (ip,port)
         self.serversock.bind(self.addr)
         self.serversock.listen(3)
-        self.quest_level = 0
+
+        self.level_ques_num=2
+        self.cur_test=0
+        self.can_next=False
+        # dictionaries of the questions and their right answer (from the options)
+        self.Right_answers= {':which year did WW2 start?' :'1939', ':which year did Israel declared?':'1948', ':Rome was founded in the year ___ ?':'753 BC', ':The Eiffel Tower is built in ________?':'1889'}
+        self.Hints= {':which year did WW2 start?' :'the war occured 6 years', ':which year did Israel declared?':'Israel is 71 years old according to 2019, so count yourself :)',
+                     ':Rome was founded in the year ___ ?':'guess:753 BC or 622 BC',':The Eiffel Tower is built in ________?':'This tower was build in honor of the Paris 100th World Exhibition of the French Revolution.'}
+        # list that every objec of it concludes a list of questins and answers
+        self.History_test_1=[ [':which year did WW2 start?','1935','1917','1939','1945'], [':which year did Israel declared?','1946','1948','1956','1962'], ['2'],
+         [':Rome was founded in the year ___ ?','753 BC','622 BC','413','928 BC'], [':The Eiffel Tower is built in ________?','1798','1889','1818','1876'] ]
+
+
         self.run()
 
-    def check_answer(self,clientsock,right_answer,data):
+    def check_answer(self,clientsock, question, ans, ques_index):
+        
+        if ans not in self.History_test_1[ques_index]:
+            print len(ans)
+            print 'ans-problem', self.History_test_1[ques_index]
+            msg= "you have to choose one of the shown answers... believe me one of them is right :)"
+            self.can_next= False
 
-        if right_answer in data:
-            msg='Right'
         else:
-            msg='Wrong'
+            self.can_next= True
+            right_answer= self.Right_answers[question[1:]]
+            if right_answer == ans:
+                msg='Right'
+            else:
+                msg='Wrong'
 
         clientsock.send(msg)
-
-
-    def time_check(self,data):
-        if 'error' in data:
-            if '10' in data:
-                msg= 'what do you say about moving to the next question?'
-                clientsock.send(msg)
-                data = clientsock.recv(self.bufSize)
-        else:
-            return False
 
     def handler(self,clientsock,addr):
         while 1:
@@ -95,50 +107,100 @@ class server:
                         print "Oh no! ended communication with ",addr
                         break
    
-
+    
                     data=rlist[0].recv(self.bufSize)
+                    data=data.strip()
                     print (data)
-                    if 'history' in data:
-
-                        msg= 'History-Level1'
+   
+                    if "SubjHistory" == data:
+                        
+                        question_answers=self.History_test_1[0]
+                        msg= 'History-Level1-1-'+"-".join(question_answers)
                         clientsock.send(msg)
                         
-                        msg= '1:which year did WW2 start?'
-                        self.quest_level +=1
-                        clientsock.send(msg)
-                        
-                        data = clientsock.recv(self.bufSize)
+                        #msg= ''
+                        #self.quest_level +=1
+                        #clientsock.send(msg)
+                        #data = clientsock.recv(self.bufSize)
                         #time_check(data)
-                            
-                        self.check_answer(clientsock,'1939',data)
-
-                        if self.quest_level >0:
-                            msg= 'History-Level2'
-                            clientsock.send(msg)
-                            self.quest_level =0
-                            
-                            msg= '1:which year did Israel declared?'
-                            self.quest_level +=1
-                            clientsock.send(msg)
-                            data = clientsock.recv(self.bufSize)
-                            self.check_answer(clientsock,'1948',data)
-
-                    elif 'math' in data:
                         
-                        msg= 'Level 1 \n \n 1: \n 5*3 + 270/9?'
-                        self.quest_level +=1
+
+                    elif 'yes hint' in data:
+                        
+                        data=data.split("-")
+                        question= data[2]
+                        question= question[1:]
+                        msg='givenhint-'+ self.Hints[question]
                         clientsock.send(msg)
+                    
+                    elif 'time-end-error' == data:
                         
-                        data = clientsock.recv(self.bufSize)
-                        self.check_answer(clientsock,'45',data)
+                        msg='bye'
+                        clientsock.send(msg)
+                        print "I had to end communication with ",addr
+                        break
+                        
+                    else:       
+                       
+                        level_len=len(self.History_test_1)
+                        data=data.split("-")
+                        subj= data[0]
+                        level= data[1]
+                        level_num= int(level[5:])
+                        question= data[2]
+                        ques_num= int(question[0])
+                        ans= data[3]
+                        # the next question index for the history test list
+                        ques_index= ques_num+level_num-1
 
-                        if self.quest_level>0:
-                            msg= '\n Leve2 \n \n 1: \n (7*2)**2 '
-                            self.quest_level =0
+                        self.check_answer(clientsock, question ,ans,ques_index-1)
+                        #sennd the next qusteion right next
+
+
+                        if self.can_next:
+                            question_answers=self.History_test_1[ques_index]
+                            #checking if we need to pass to the new level
+                            
+                            if len (question_answers) == 1:
+                                
+                                level_num+=1
+                                level= level[0:5]+str (level_num)
+                                question_answers= self.History_test_1[ques_num+level_num-1]
+  
+                            msg=('{}-{}-{}-{}').format(subj,str(level),ques_num+1,"-".join(question_answers))
+                            print msg
                             clientsock.send(msg)
-                            self.quest_level +=1
-                            data = clientsock.recv(self.bufSize)
-                            self.check_answer(clientsock,'196',data)
+
+
+
+                        
+                        # if self.quest_level >0:
+                        #     msg= 'History-Level2'
+                        #     clientsock.send(msg)
+                        #     self.quest_level =0
+                            
+                        #     msg= '1:which year did Israel declared?'
+                        #     self.quest_level +=1
+                        #     clientsock.send(msg)
+                        #     data = clientsock.recv(self.bufSize)
+                        #     self.check_answer(clientsock,'1948',data)
+
+                    # elif 'math' in data:
+                        
+                    #     msg= 'Level 1 \n \n 1: \n 5*3 + 270/9?'
+                    #     self.quest_level +=1
+                    #     clientsock.send(msg)
+                        
+                    #     data = clientsock.recv(self.bufSize)
+                    #     self.check_answer(clientsock,'45',data)
+
+                    #     if self.quest_level>0:
+                    #         msg= '\n Leve2 \n \n 1: \n (7*2)**2 '
+                    #         self.quest_level =0
+                    #         clientsock.send(msg)
+                    #         self.quest_level +=1
+                    #         data = clientsock.recv(self.bufSize)
+                    #         self.check_answer(clientsock,'196',data)
                                 
  
                     #if "Admin" in data:
@@ -167,5 +229,6 @@ save_free_port()
 
 ser= server(ip,password,port)
 ser.run()
+
 
 
