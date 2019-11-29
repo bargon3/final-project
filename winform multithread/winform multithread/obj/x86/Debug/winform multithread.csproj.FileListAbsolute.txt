@@ -13,3 +13,20 @@ C:\Users\Noam\Desktop\winform multithread\winform multithread\obj\x86\Debug\winf
 C:\Users\Noam\Desktop\winform multithread\winform multithread\obj\x86\Debug\winform multithread.csproj.GenerateResource.cache
 C:\Users\Noam\Desktop\winform multithread\winform multithread\obj\x86\Debug\winform multithread.exe
 C:\Users\Noam\Desktop\winform multithread\winform multithread\obj\x86\Debug\winform multithread.pdb
+E:\YB project\winform multithread\winform multithread\bin\Debug\winform multithread.exe
+E:\YB project\winform multithread\winform multithread\bin\Debug\winform multithread.pdb
+E:\YB project\winform multithread\winform multithread\obj\x86\Debug\winform multithread.csprojAssemblyReference.cache
+E:\YB project\winform multithread\winform multithread\obj\x86\Debug\winform_multithread.Form1.resources
+E:\YB project\winform multithread\winform multithread\obj\x86\Debug\winform_multithread.Properties.Resources.resources
+E:\YB project\winform multithread\winform multithread\obj\x86\Debug\winform multithread.csproj.GenerateResource.cache
+E:\YB project\winform multithread\winform multithread\obj\x86\Debug\winform multithread.exe
+E:\YB project\winform multithread\winform multithread\obj\x86\Debug\winform multithread.pdb
+H:\YB project\winform multithread\winform multithread\bin\Debug\winform multithread.exe
+H:\YB project\winform multithread\winform multithread\bin\Debug\winform multithread.pdb
+H:\YB project\winform multithread\winform multithread\obj\x86\Debug\winform multithread.csprojAssemblyReference.cache
+H:\YB project\winform multithread\winform multithread\obj\x86\Debug\winform_multithread.Form1.resources
+H:\YB project\winform multithread\winform multithread\obj\x86\Debug\winform_multithread.Properties.Resources.resources
+H:\YB project\winform multithread\winform multithread\obj\x86\Debug\winform multithread.csproj.GenerateResource.cache
+H:\YB project\winform multithread\winform multithread\obj\x86\Debug\winform multithread.csproj.CoreCompileInputs.cache
+H:\YB project\winform multithread\winform multithread\obj\x86\Debug\winform multithread.exe
+H:\YB project\winform multithread\winform multithread\obj\x86\Debug\winform multithread.pdb

@@ -1,0 +1,392 @@
+client:
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Windows.Forms;
+using System.Net.Sockets;
+using System.Net;
+using System.IO;
+using System.Threading;
+
+namespace winform_multithread
+{
+    public partial class Form1 : Form
+    {
+        TcpClient client; // socket client
+        StreamWriter sw;  // streamWriter
+        StreamReader sr;  // streamReader
+        char[] charArray = new char[100]; // read char array
+        int ticks;
+
+        public Form1()
+        {
+            InitializeComponent();
+
+            client = new TcpClient();
+            client.Connect(new IPEndPoint(IPAddress.Parse("10.0.0.75"), 64420));
+            sw = new StreamWriter(client.GetStream()); sw.AutoFlush = true;
+            sr = new StreamReader(client.GetStream());
+            label1.Text = "connection established";
+
+            listBox1.Items.Add("Please eneter your name");
+            
+            Console.WriteLine("ok");
+            timer1.Start();
+            backgroundWorker1.RunWorkerAsync(sr);
+        }
+
+        private void button_clicked(object sender, EventArgs e)
+        {
+            ticks = 0;
+            timer1.Start();
+            string msg = textBox1.Text;
+
+            if (listBox1.Items[0].ToString().Contains("Which subject do you want to be testest on?")        )
+            {
+                if (msg.Contains("history") || msg.Contains("History"))
+                {
+                    listBox1.Items.Clear();
+                    listBox1.Items.Add("History");
+                    sw.WriteLine("SubjHistory");
+                }
+
+                else
+                    listBox1.Items.Add("There is not such a subject, please try again");
+            }
+
+            else if ( listBox1.Items[0].ToString().Contains ("Please eneter your name") )
+            {
+                listBox1.Items.Clear();
+                listBox1.Items.Add("Which subject do you want to be testest on?");
+                My_name.Text = msg;
+            }
+            else
+                sw.WriteLine(My_level.Text+ "-" + listBox1.Items[1]+ "-" + textBox1.Text);
+
+            textBox1.Text = "";
+
+        }
+
+        private void backgroundWorker1_DoWork(object sender, DoWorkEventArgs e) // receive msg
+        {
+            StreamReader sr = e.Argument as StreamReader; // get streamReader argument from runWorkerAsync
+            var data = "";
+            var readByteCount = 0;
+            string[] words; string subj; string level;string ques_num; string question;
+
+
+            do {
+
+                readByteCount = sr.Read(charArray, 0, charArray.Length);
+
+                if (readByteCount > 0) {
+
+                    data = new string(charArray, 0, readByteCount);
+
+                    //Invoke(new Action(() => listBox1.Items.Add("server: " + data)));
+                    if (data.Contains("Right") || data.Contains("Wrong"))
+                    {
+                        Invoke(new Action(() => listBox1.Items.Clear()));
+                        Invoke(new Action(() => listBox1.Items.Add(data)));
+                    }
+
+                    else if (data == "bye")
+                    {
+                        Invoke(new Action(() => label1.Text = "connection terminated"));
+                        Invoke(new Action(() => listBox1.Items.Add("you lost your time, you are out")));
+                        Invoke(new Action(() => textBox1.Enabled=false));
+                        client.Close();
+                    }
+
+                    else if (data == "you have to choose one of the shown answers... believe me one of them is right :)")
+                    {
+                        Invoke(new Action(() => listBox1.Items.Add("")));
+                        Invoke(new Action(() => listBox1.Items.Add(data)));
+                    }
+
+                    else
+                    {
+                        words = data.Split('-');
+                        subj = words[0];
+                        level = words[1];
+                        ques_num = words[2];
+                        question = words[3];
+
+                        Invoke(new Action(() => My_level.Text = subj + "-" + level));
+                        Invoke(new Action(() => listBox1.Items.Add(ques_num + question)));
+
+                        for (int i = 4; i < words.Length; i++)
+                        {
+                            Invoke(new Action(() => listBox1.Items.Add(" ")));
+                            Invoke(new Action(() => listBox1.Items.Add(words[i])));
+
+                        }
+
+
+                    }
+
+
+
+                }
+                else Thread.Sleep(100);
+                Console.WriteLine(data);
+                }   
+            while (data != "bye");
+            Invoke(new Action(() => label1.Text = "connection terminated"));
+        }
+
+        private void backgroundWorker1_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e) {
+            client.Close();
+        }
+
+        private void timer1_Tick(object sender, EventArgs e)
+        {
+            ticks++;
+            if (ticks == 10)
+            {
+                listBox1.Items.Add("");
+                listBox1.Items.Add("10 last seconds to answer");
+            }
+
+            else if (ticks==40)
+                {
+                    sw.WriteLine("40-seconds-error");
+                }
+        }
+    }
+}
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------
+
+server:
+'''
+    program Server
+    Author : Noam Tal
+    program is used as a server for a client by picking a free port on the computer and connecting the client to the ADDR.
+    The client can use some cool commands: getting the weather in Rehovot, Openning a site and getting the time and picking a desert.In order to
+    exit a password is needed
+'''
+
+from socket import *
+import threading
+import time
+from random import choice
+import os
+import thread
+import subprocess
+import math
+import select
+
+
+
+#gets the ip adress of the computer
+def getIp():
+    
+    s = socket(AF_INET, SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    print(s.getsockname()[0])
+    ip=s.getsockname()[0]
+    s.close()
+    return str(ip)
+    
+
+#finding a free port for the communication
+def get_open_port():
+
+        s = socket(AF_INET, SOCK_STREAM)
+        s.bind(("",0))
+        s.listen(1)
+        port = s.getsockname()[1]
+        print port
+        s.close()
+        return port
+
+#saving the free port for the communication in a file
+def save_free_port():
+
+        #os.chdir('C:')
+        f = open(r"getport.txt", "w")
+        f.write(str(port))
+
+
+class server:
+
+    #details
+    bufSize= 1024
+    serversock = socket(AF_INET, SOCK_STREAM)
+    quest_level = 0
+
+    def __init__(self, ip, password, port):
+       
+        self.ip=ip
+        self.port=port
+        self.password=password
+        self.addr= (ip,port)
+        self.serversock.bind(self.addr)
+        self.serversock.listen(3)
+
+        self.level_ques_num=2
+        self.cur_test=0
+        self.can_next=False
+        self.Right_answers= {':which year did WW2 start?' :'1939', ':which year did Israel declared?':'1948',':Rome was founded in the year ___ ?':'753 BC',':The Eiffel Tower is built in ________?':'1889'}
+                             
+        self.History_test_1=[ [':which year did WW2 start?','1935','1917','1939','1945'], [':which year did Israel declared?','1946','1948','1956','1962'], ['2'],
+         [':Rome was founded in the year ___ ?','753 BC','622 BC','413','928 BC'], [':The Eiffel Tower is built in ________?','1798','1889','1818','1876'] ]
+
+
+        self.run()
+
+    def check_answer(self,clientsock, question, ans, ques_index):
+
+        if str(ans) not in self.History_test_1[ques_index]:
+            print len(ans)
+            print 'ans-problem', self.History_test_1[ques_index]
+            msg= "you have to choose one of the shown answers... believe me one of them is right :)"
+            self.can_next= False
+
+        else:
+            self.can_next= True
+            right_answer= self.Right_answers[question[1:]]
+            if right_answer in ans:
+                msg='Right'
+            else:
+                msg='Wrong'
+
+        clientsock.send(msg)
+
+    def handler(self,clientsock,addr):
+        while 1:
+
+                    #Trying recieving data, if he cant (the client left) he waits for another connection
+                    try:
+                        rlist,_,_ = select.select( [clientsock], [], [] )
+
+                    except :
+                        print "Oh no! ended communication with ",addr
+                        break
+   
+    
+                    data=rlist[0].recv(self.bufSize)
+                    print (data)
+   
+                    if "SubjHistory" in data:
+                        question_answers=self.History_test_1[0]
+                        msg= 'History-Level1-1-'+"-".join(question_answers)
+                        clientsock.send(msg)
+                        
+                        #msg= ''
+                        #self.quest_level +=1
+                        #clientsock.send(msg)
+                        #data = clientsock.recv(self.bufSize)
+                        #time_check(data)
+                        
+
+                    elif '40-seconds-error' in data:
+                        msg='bye'
+                        clientsock.send(msg)
+                        print "I had to end communication with ",addr
+                        break
+                        
+                    else:       
+                       
+                        level_len=len(self.History_test_1)
+                        data=data.split("-")
+                        subj= data[0]
+                        level= data[1]
+                        level_num= int(level[5:])
+                        question= data[2]
+                        ques_num= int(question[0])
+                        ans= data[3]
+                        # the next question index for the history test list
+                        ques_index= ques_num+level_num-1
+
+                        self.check_answer(clientsock, question ,ans,ques_index-1)
+                        #sennd the next qusteion right next
+
+
+                        if self.can_next:
+                            question_answers=self.History_test_1[ques_index]
+                            #checking if we need to pass to the new level
+                            
+                            if len (question_answers) == 1:
+                                
+                                level_num+=1
+                                level= level[0:5]+str (level_num)
+                                question_answers= self.History_test_1[ques_num+level_num-1]
+  
+                            msg=('{}-{}-{}-{}').format(subj,str(level),ques_num+1,"-".join(question_answers))
+                            print msg
+                            clientsock.send(msg)
+
+
+
+                        
+                        # if self.quest_level >0:
+                        #     msg= 'History-Level2'
+                        #     clientsock.send(msg)
+                        #     self.quest_level =0
+                            
+                        #     msg= '1:which year did Israel declared?'
+                        #     self.quest_level +=1
+                        #     clientsock.send(msg)
+                        #     data = clientsock.recv(self.bufSize)
+                        #     self.check_answer(clientsock,'1948',data)
+
+                    # elif 'math' in data:
+                        
+                    #     msg= 'Level 1 \n \n 1: \n 5*3 + 270/9?'
+                    #     self.quest_level +=1
+                    #     clientsock.send(msg)
+                        
+                    #     data = clientsock.recv(self.bufSize)
+                    #     self.check_answer(clientsock,'45',data)
+
+                    #     if self.quest_level>0:
+                    #         msg= '\n Leve2 \n \n 1: \n (7*2)**2 '
+                    #         self.quest_level =0
+                    #         clientsock.send(msg)
+                    #         self.quest_level +=1
+                    #         data = clientsock.recv(self.bufSize)
+                    #         self.check_answer(clientsock,'196',data)
+                                
+ 
+                    #if "Admin" in data:
+                       # msg=''
+                       # msg=msg[:-1]
+                       # print 'nowwwwwww'
+                       # print msg
+                       # clientsock.send(msg)
+                        
+                    #else:
+
+        clientsock.close()
+
+    def run (self):
+        while 1:
+            print 'waiting for connection...'
+            clientsock, self.addr = self.serversock.accept()
+            print '...connected from:', self.addr
+            thread.start_new_thread(self.handler, (clientsock, self.addr)) 
+
+
+ip = getIp()
+password='Bye'
+port= get_open_port()
+save_free_port()
+
+ser= server(ip,password,port)
+ser.run()
+
+
+
+
+
+
+
+
