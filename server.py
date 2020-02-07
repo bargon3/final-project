@@ -15,8 +15,8 @@ import thread
 import subprocess
 import math
 import select
-
-
+import sqlite3 as lite
+import sys
 
 #gets the ip adress of the computer
 def getIp():
@@ -48,16 +48,40 @@ def save_free_port():
         f.write(str(port))
 
 
-class server:
+#------------------------------------------------------------------
+# class User:
 
+#     #creats user with his name and the level
+#     def __init__(self, name, cur_level):
+#         self.name= name
+#         self.cur_level= cur_level
+#         self.history=''
+
+#     def change_cur_level(self,cur_level):
+#         self.cur_level=cur_level
+        
+#     # adding a passed level to the user history
+#     # done level example: -history:2
+#     def add_history(self, done_level):
+#         self.history += done_level
+
+
+# ------------------------------------------------------------------
+
+
+class server:
+   
     #details
     bufSize= 1024
     serversock = socket(AF_INET, SOCK_STREAM)
     quest_level = 0
+    user_id=0
 
     def __init__(self, ip, password, port):
-       
-        self.ip=ip
+        
+        #user_id+=1
+
+        self.ip=ip 
         self.port=port
         self.password=password
         self.addr= (ip,port)
@@ -68,12 +92,25 @@ class server:
         self.cur_test=0
         self.can_next=False
         # dictionaries of the questions and their right answer (from the options)
-        self.Right_answers= {':which year did WW2 start?' :'1939', ':which year did Israel declared?':'1948', ':Rome was founded in the year ___ ?':'753 BC', ':The Eiffel Tower is built in ________?':'1889'}
-        self.Hints= {':which year did WW2 start?' :'the war occured 6 years', ':which year did Israel declared?':'Israel is 71 years old according to 2019, so count yourself :)',
+        self.Right_answers= {':which year did WW2 start?' :'1939', ':which year did Israel declared?':'1948', ':Rome was founded in the year ___ ?':'753 BC', ':The Eiffel Tower is built in ________?':'1889',
+        ':The first newspaper in the world was started by?' :'China', ':Who is known as Man of Blood and Iron?' :'Bismarck', ':Which is considered as oldest civilization of the world?' :'Mesopotamian Civilization',
+        ':Who is considered as the master of Greek comedy?' :'Aristophanes', ':Young Italy movement by led by two revolutionaries, One was "Mazzini" and Other was?' :'Garibaldi'    }
+        
+        #dictionarie of hints to every quesrion
+        self.Hints= {':which year did WW2 start?' :'the war occured during 6 years', ':which year did Israel declared?':'Israel is 71 years old according to 2019, so count yourself :)',
                      ':Rome was founded in the year ___ ?':'guess:753 BC or 622 BC',':The Eiffel Tower is built in ________?':'This tower was build in honor of the Paris 100th World Exhibition of the French Revolution.'}
+        
         # list that every objec of it concludes a list of questins and answers
-        self.History_test_1=[ [':which year did WW2 start?','1935','1917','1939','1945'], [':which year did Israel declared?','1946','1948','1956','1962'], ['2'],
-         [':Rome was founded in the year ___ ?','753 BC','622 BC','413','928 BC'], [':The Eiffel Tower is built in ________?','1798','1889','1818','1876'] ]
+        self.History_test_1=[ [':which year did WW2 start?','1935','1917','1939','1945'], [':which year did Israel declared?','1946','1948','1956','1962'],
+         [':Rome was founded in the year ___ ?','753 BC','622 BC','413','928 BC'], ['2'], 
+
+         [':The Eiffel Tower is built in ________?','1798','1889','1818','1876'], [':The first newspaper in the world was started by?','Japan','China','USA','India'],
+         [':Who is known as Man of Blood and Iron?','Napoleon','Sophocles','Aristophanes','Philip'], ['3'],
+
+         [':Who is considered as the master of Greek comedy?','Aeschylus','Bismarck','Ho Chi Minh','Sir Walter Scott'],
+         [':Young Italy movement by led by two revolutionaries, One was "Mazzini" and Other was?','Garibaldi','Victor','Emmanuel','Louis'] ,
+         [':Which is considered as oldest civilization of the world?','Mesopotamian Civilization','Harappan Civilization','Chinese Civilization','Egyptain Civilization'], ['4']    ] 
+                
 
 
         self.run()
@@ -95,6 +132,7 @@ class server:
                 msg='Wrong'
 
         clientsock.send(msg)
+        return msg
 
     def handler(self,clientsock,addr):
         while 1:
@@ -110,21 +148,50 @@ class server:
     
                     data=rlist[0].recv(self.bufSize)
                     data=data.strip()
-                    print (data)
-   
-                    if "SubjHistory" == data:
+                    print (data)                
+                    
+                    # data= 'register-Leo-history:1'
+                    if 'register' in data:
+
+                        original_msg= data
+
+                        data=data.split("-")
+                        name= data[1]
+                        curr_level= data[2]
+                        cursor.execute('''INSERT INTO users(name, subject, grade, current_level, history)
+                        VALUES(?,?,?,?,?)''', (name,'history', 0, curr_level,''))
+                        conn.commit()
+
+                        # with lite.connect("test.db") as con:
+                        #     cur = con.cursor()
+                        #     data=data.split("-")
+                        #     name= data[1]
+                        #     curr_level= data[2]
+                        #     cursor.execute('''INSERT INTO users(name, current_level)
+                        #     VALUES(?,?)''', (name,curr_level))
+                        #     con.commit()
                         
-                        question_answers=self.History_test_1[0]
-                        msg= 'History-Level1-1-'+"-".join(question_answers)
-                        clientsock.send(msg)
+                        print 'his name is--->'+data[1]
                         
-                        #msg= ''
-                        #self.quest_level +=1
-                        #clientsock.send(msg)
-                        #data = clientsock.recv(self.bufSize)
-                        #time_check(data)
+                        
+                            
+                        if 'History' in original_msg: 
+                            
+                            question_answers=self.History_test_1[0]
+                            msg= 'History-Level1-1-'+"-".join(question_answers)
+                            clientsock.send(msg)
+                            
+                            #msg= ''
+                            #self.quest_level +=1
+                            #clientsock.send(msg)
+                            #data = clientsock.recv(self.bufSize)
+                            #time_check(data)
                         
 
+                    elif 'Admin' in data:
+                            Admin_handle(self,clientsock,addr,data)
+                            
+                            
                     elif 'yes hint' in data:
                         
                         data=data.split("-")
@@ -150,23 +217,57 @@ class server:
                         question= data[2]
                         ques_num= int(question[0])
                         ans= data[3]
+                        name=data[4]
                         # the next question index for the history test list
                         ques_index= ques_num+level_num-1
 
-                        self.check_answer(clientsock, question ,ans,ques_index-1)
+                        feedback= self.check_answer(clientsock, question ,ans,ques_index-1)
                         #sennd the next qusteion right next
+                        if feedback== 'Right':
+                            cursor.execute('''SELECT grade FROM users WHERE name=?''', (name,))
+                            old_grade = cursor.fetchone() # retrieves the next row
+                            cursor.execute('''UPDATE users SET grade = ?  WHERE name = ? ''',
+                            (int (old_grade[0]) +2, name))
 
-
-                        if self.can_next:
+                        if self.can_next:   
                             question_answers=self.History_test_1[ques_index]
                             #checking if we need to pass to the new level
                             
                             if len (question_answers) == 1:
                                 
+                                # adding to the history (sql)
+                                cursor.execute('''SELECT history FROM users WHERE name=?''', (name,))
+                                old_history = cursor.fetchone() # retrieves the next row
+                                print old_history
+                                print type(old_history)
+                                new_history= old_history[0]+', succsses at '+ subj+ ':' + str(level_num)
+                                cursor.execute('''UPDATE users SET history = ?  WHERE name = ? ''',
+                                (new_history, name))
+                                
+                                #changing to the next level
                                 level_num+=1
                                 level= level[0:5]+str (level_num)
                                 question_answers= self.History_test_1[ques_num+level_num-1]
+
+                                #updating the current level of the user (sql)
+                                cur_level= subj+ ':' + str(level_num)
+                                cursor.execute('''UPDATE users SET current_level = ?  WHERE name = ? ''',
+                                (cur_level, name))
+                                
+                                conn.commit()
+
   
+                            cursor.execute("SELECT * FROM users") # Fetching data
+                            data= ''
+                            for row in cursor:
+                                msg= "id-> ",row[0]," name-> ",row[1]," subject->",row[2], " grade->", row[3]," current_level->",row[4], " history->", row[5]
+                                print msg
+                                data+=msg+'//'
+                                
+                            print data    
+                            clientsock.send(msg)    
+                                
+                            print '-------------------------------------------------------------------'
                             msg=('{}-{}-{}-{}').format(subj,str(level),ques_num+1,"-".join(question_answers))
                             print msg
                             clientsock.send(msg)
@@ -213,7 +314,14 @@ class server:
                     #else:
 
         clientsock.close()
-
+        
+    def  Admin_handle(self,clientsock,addr,data):
+        
+        data= data[5:]
+        print ('without' +data)
+        
+        
+        
     def run (self):
         while 1:
             print 'waiting for connection...'
@@ -222,10 +330,27 @@ class server:
             thread.start_new_thread(self.handler, (clientsock, self.addr)) 
 
 
+
+
+
 ip = getIp()
 password='Bye'
 port= get_open_port()
 save_free_port()
+
+
+conn = None
+file_name='E:\\YB project\\test.db'
+
+conn = lite.connect(file_name)
+conn = lite.connect('test.db', check_same_thread=False)
+
+cursor = conn.cursor()
+#cursor.execute('''DROP TABLE users''')
+
+#cursor.execute(''' CREATE TABLE users(id INTEGER PRIMARY KEY, name TEXT, subject Text,
+#grade INTEGER, current_level TEXT, history TEXT ) ''')
+conn.commit()
 
 ser= server(ip,password,port)
 ser.run()
