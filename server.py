@@ -17,6 +17,8 @@ import math
 import select
 import sqlite3 as lite
 import sys
+import base64
+
 
 #gets the ip adress of the computer
 def getIp():
@@ -56,22 +58,29 @@ class server:
     serversock = socket(AF_INET, SOCK_STREAM)
     quest_level = 0
     user_id=0
+    users_socket= {}
+    users_hints= {}
+    users_Time_till_hint= {}
+    secret_code = "8642"
 
     def __init__(self, ip, port):
         
         #user_id+=1
-
+        self.auto_shut= True
         self.ip=ip 
         self.port=port
-        self.addr= (ip,port)
+        self.addr= ( ('',port) )
         self.serversock.bind(self.addr)
         self.serversock.listen(3)
 
         self.level_ques_num=2
         self.cur_test=0
         self.can_next=False
-        self.Time_to_hint= 20
-        self.yes_hint= True
+        self.Time_to_hint= "20"
+        self.yes_hint= "True"
+        self.admin_sock= None
+        self.share_screen_sock= None
+        self.end= False
         
         # dictionaries of the questions and their right answer (from the options)
         self.History_right_answers= {':which year did WW2 start?' :'1939', ':which year did Israel declared?':'1948', ':Rome was founded in the year ___ ?':'753 BC', ':The Eiffel Tower is built in ________?':'1889',
@@ -155,51 +164,193 @@ class server:
         clientsock.send(msg)
         return msg
 
+
+    def check_exit (self,clientsock,addr,cursor):
+
+        t1= time.ctime()    #  'Tue May 05 22:05:44 2020' 
+        t1= t1.split(" ")
+        day= t1[0]
+        HMS=t1[3]     
+        last_entry= day+ ":" + HMS
+
+
+       
+
+        for key, value in self.users_socket.items():
+                if value == clientsock:
+                    del self.users_socket[key]
+                    cursor.execute('''UPDATE users SET Last_entry = ? WHERE name = ? ''',
+                    (last_entry , key))
+                    conn.commit()
+                    break
+        
+        if self.share_screen_sock != None:
+            if clientsock == self.share_screen_sock:
+
+                self.share_screen_sock= None
+                
+                if self.admin_sock is not None:
+
+                    self.admin_sock.send("Share_screen_user_gone")                           
+                    print ("sent to admin share screen alert")
+        
+        else:
+                if self.admin_sock == clientsock:
+                    self.admin_sock= None
+                    print ("Admin is out!!!!!")
+
+                    
+
     def  Admin_handle(self,clientsock,addr,data):
 
-        print ('Admin message')
-        # getting the requst that comes after the 'Admin' word, for example: Admin_update will give- 'update'
+        # getting the requst that comes after the 'Admin_' word, for example: "Admin_update" will give- "update"
         request= data[6:]
         print ('The admin request--->'+ request)
-        #print len(request)
         
 
         if 'update' in request:
             cursor.execute("SELECT * FROM users") # Fetching data
             table= ''
             for row in cursor:
-                msg= " id-> {}, name-> {}, subject-> {}, study_units-> {},current_level-> {}, current_question-> {}, L_grade-> {}, T_grade-> {}, history-> {} ".format( row[0] ,
-                row[1],row[2],row[3],row[4],row[5], row[6], row[7], row[8] )
+                msg= " id-{}- name-{}- subject-{}- study_units-{}- current_level-{}- current_question-{}- L_grade-{}- T_grade-{}- history-{}- Last_entry-{} ".format( row[0] ,
+                row[1],row[2],row[3],row[4],row[5], row[6], row[7], row[8] , row[10])
                 
                 table+= str(msg)+'/'
-                 
+
+            #cursor.close()
             clientsock.send(table) 
         
-        # Time hint change request, example: 'Time_till_hint:5'
-        elif 'Time_till_hint:' in request:
-            need= data.split(':')[1]
-            #part= request[15:len(request)]
-            #print (part +'kong')
-            #print (need+ 'nanan')
-            self.Time_to_hint= int (need)
+        elif "End_test" in request:
             
-            clientsock.send("new_time_hint-" + str( self.Time_to_hint ))
+            print (self.users_socket)
+            for key, value in self.users_socket.items():
+                self.users_socket[key].send("bye")
+            
+            self.end= True
 
-        #example: 'Hints:False'
-        elif 'Hints:' in request:
+
+        # Time hint change request, example: 'all_Time_till_hint:5'
+        elif 'all_Time_till_hint:' in request:
+            
+            time= data.split(':')[1]
+            self.Time_to_hint= time
+
+            for value in self.users_Time_till_hint:
+                    self.users_Time_till_hint[value]= time
+
+            #clientsock.send("new_time_hint-" + str( self.Time_to_hint ))
+            print ("new_time_hint-" + self.Time_to_hint )
+        
+        #example: 'private_Time_till_hint-25-Noam'
+        elif 'private_Time_till_hint' in request:
+            
+            request = request.split('-')
+            value = request[1]
+            name= request[2]
+            self.users_Time_till_hint[name] = value
+
+        #example: 'all_Hints:False'
+        elif 'all_Hints:' in request:
+
             need= data.split(':')[1]
-            #print (part+'yung')
-            change= eval(need)
-            print (change)
-            print ( type(change) )
-            if change is False or change is True :
-                self.yes_hint= change
-                print (self.yes_hint)  
+
+            if need is "False" or "True" :
+                self.yes_hint = need
+                for value in self.users_hints:
+                    self.users_hints[value]= need
+                    
             else:
-                print ('bad input- ' + str(change) )
+                print ('bad input- ' + need )
                 msg= 'bad input'
                 clientsock.send(msg)
-    
+        
+        #example: 'private_Hints-False-Noam'
+        elif 'private_Hints' in request:
+            
+            request = request.split('-')
+            value = request[1]
+            name= request[2]
+            self.users_hints[name] = value
+            print (self.users_Time_till_hint)
+            
+        
+        elif "Shutdown" in request:
+            
+            Name= request.split('-')[1]
+
+            try:
+                
+                wanted_clientsock= self.users_socket[Name]
+                msg= "Shutdown , "+ Name
+                wanted_clientsock.send(msg)
+                print ("Shut down to "+ Name)
+
+            except expression as identifier:
+                print (identifier)
+                print ("cant shutdown->" + Name)
+
+
+        elif "auto_shut" in request:
+
+            print ("in????????????????")
+            if  "allow" in request:
+                print ("allowing auto shut")
+                self.auto_shut= True
+                
+            if  "stop"  in request:
+                print ("Stoping auto shut")
+                self.auto_shut= False
+        
+        
+
+        #example: "Share_screen-Noam-63000
+        elif "Share_screen" in request:
+
+            Name= request.split('-')[1]
+            p = request.split('-')[2]
+            try:
+                wanted_clientsock= self.users_socket[Name]
+                self.share_screen_sock= wanted_clientsock
+                msg= "activate_share_screen-"+ p 
+                wanted_clientsock.send(msg)
+            except:
+                print ("He cant share screen")
+
+            print ("Share screen command sent to "+ Name + " ,  port number" + p )
+        
+        #example: 'private_chat-Noam-Is everything ok?'
+        elif "private_chat" in request:
+
+            Name= request.split('-')[1]
+            msg= request.split('-')[2]
+            wanted_clientsock = self.users_socket[Name]
+            #print type(self.users_socket[Name])
+
+            if wanted_clientsock:
+                wanted_clientsock.send("Admin_msg-"+msg)
+                print ("chat msg send to"+ Name)
+            else:
+                print "problem"
+        
+        elif "to_all_Broadcast" in request:
+
+            msg= request.split('-')[1]
+            for key, value in self.users_socket.items():
+                if value != "":
+
+                    try:
+                        self.users_socket[key].send("Admin_msg-" + msg)
+                    except Exception as e:
+                        print(e)
+
+        elif "Good " in request:
+
+            print (self.admin_sock)
+            self.admin_sock.__send("man")
+        
+                
+
+
     def handler(self,clientsock,addr):
         
         while 1:
@@ -210,12 +361,18 @@ class server:
                         data=rlist[0].recv(self.bufSize)
                         data=data.strip()
                         print ('recieved-'+data)
-                        if data== '':
+
+                        if data == '' :
                              print "He is gone, ended communication with ",addr
                              break
+                        
+                        elif self.end == True:
+                            clientsock.send("The test is over you cant connect")
 
                     except :
+                        
                         print "Oh no! ended communication with ",addr
+                        self.check_exit(clientsock,addr, cursor)
                         break
    
                     
@@ -225,21 +382,38 @@ class server:
                         print ('registering')
                         user= data.split('-')
                         user_name= user[1] 
-                        user_password= user[2]
+                        user_password= user[2] 
+                        encrypted = base64.b64encode(user_password)
 
                         cursor.execute('''SELECT password FROM users WHERE name=?''', (user_name,))                      
                         check_profile = cursor.fetchone()
+                        #cursor.close()
                         print (check_profile)
-                        if  check_profile and user_password == str(check_profile[0]):
-                            msg='already_created'
-                            
-                            
+
+                        if len( user_name ) <2:
+                            msg= "Name must be at least 2 characters"
+                        
+                        elif len( user_password ) <2:
+                            msg= "password must be at least 2 characters"
+
+                        # if the acount already created, he can continue, but if it it new acount with username that is taken he needs to pick new one
+                        elif  check_profile:
+                            if  user_password == base64.b64decode ( str(check_profile[0]) ) :                             
+                                msg='already_created'
+                                #self.users_hints[user_name] = self.yes_hint  
+                                #self.users_Time_till_hint [user_name ]= self.Time_to_hint
+
+                            else:
+                                msg= 'If you are a new user: Name already taken, please pick a new one. \n if not, wrong password'                      
 
                         else:
-                            cursor.execute('''INSERT INTO users(name,password)
-                            VALUES(?,?)''', (user_name,user_password))
+                            cursor.execute('''INSERT INTO users(name,password, Last_entry)
+                            VALUES(?,?,?)''', (user_name,encrypted,"Now"))
                             conn.commit()
+                            #cursor.close()
                             msg= 'Great'
+                            self.users_hints[user_name] = self.yes_hint   
+                            self.users_Time_till_hint [user_name ]= self.Time_to_hint 
                         
                         
                         clientsock.send(msg)
@@ -250,37 +424,46 @@ class server:
 
                         user= data.split('-')                        
                         user_name= user[0]
-                        user_password= user[1]
                         print ('His profile-' + user_name+ user_password )
 
-                        cursor.execute('''SELECT subject, current_level, current_question FROM users WHERE name=? AND  password= ?''', 
-                        (user_name,user_password ,))  
+                        self.users_socket[user_name]= clientsock
+
+                        cursor.execute('''SELECT subject, current_level, current_question FROM users WHERE name=?''', 
+                        (user_name ,))  
 
                         info= cursor.fetchone()
+                       # cursor.close()
                         print (info)
 
-                        subj= str(info[0])
-                        level_num= int(info[1][1])
-                        level= 'Level'+ str(level_num)
-                        curr_ques= str(info[2])
+                        if info != None:
 
+                            subj= str(info[0])
+                            level_num= int(info[1][1])
+                            level= 'Level'+ str(level_num)
+                            curr_ques= str(info[2])
 
-                        
+                            ques_index= int(curr_ques) +level_num-2
+                            if 'H' in subj:
+                                subj='History'
+                                question_answers=self.History_test_1[ques_index]
 
-                        
-                        ques_index= int(curr_ques) +level_num-2
-                        if 'H' in subj:
-                            subj='History'
-                            question_answers=self.History_test_1[ques_index]
-
-                        if 'E' in subj:
-                                subj='English'
-                                question_answers=self.English_test[ques_index]
+                            if 'E' in subj:
+                                    subj='English'
+                                    question_answers=self.English_test[ques_index]
                                 
-                        msg=('{}-{}-{}-{}-{}').format(subj,str(level_num),curr_ques,"-".join(question_answers), str(self.Time_to_hint) )
+                            msg=('{}-{}-{}-{}-{}').format(subj,level ,curr_ques,"-".join(question_answers), self.users_Time_till_hint[user_name] )
+                            
+                            cursor.execute('''UPDATE users SET Last_entry = ? WHERE name = ? ''',
+                            ("Now" , user_name))
+                            
+                        else:
+
+                            msg= "not_registered"
+                            print ("old acount no register")
+              
                         clientsock.send(msg)
 
-
+                    
                     # data= register-Noam-History-5
                     elif 'register' in data:
 
@@ -294,7 +477,8 @@ class server:
                         level_grade= T_grade= 0 
                         curr_question= 1
                         curr_level= '?'                     
-                        print 'his name is--->'+data[1]
+
+                        self.users_socket[name]= clientsock
                                                                        
                         if 'History' in original_msg: 
                             # 3 or 4 points- level 1
@@ -333,42 +517,82 @@ class server:
                         cursor.execute('''UPDATE users SET subject = ?, study_units = ?, current_level=?, current_question = ?, L_grade = ?, T_grade = ?, history = ?  WHERE name = ? ''',
                         (subj[0],study_units, curr_level , curr_question, level_grade ,T_grade  ,'', name)  )
                         conn.commit()
+                        #cursor.close()
                         print (msg)
                         clientsock.send(msg)
 
-
+                   
+                    elif ('I am Admin'+self.secret_code) in data:
+                        print ('Admin connected')
+                        self.admin_sock= clientsock
+                    
                     # if admin going to the admin handle function    
-                    elif 'Admin' in data:
-                            print ('amazing')
-                            self.Admin_handle(clientsock,addr,data)
+                    elif 'Admin_' in data:
+                        print ('admin sent msg')
+                        self.Admin_handle(clientsock,addr,data)
                             
                             
                     elif 'yes hint' in data:
 
-                        print (self.yes_hint)
-                        if self.yes_hint:
-                            data=data.split("-")
-                            question= data[2]
-                            question= question[1:]
-                            msg='givenhint-'+ self.History_Hints[question]
-                            clientsock.send(msg)
+                        print (self.users_hints)
+                        print (data)
+                        data=data.split("-")
+                        user_name = data[0]
+                        
+                        #Noam- Level3- when is the...- yes hint
+                        if self.users_hints[user_name] == "True":
                             
-                        if not self.yes_hint:
+                            try:
+                                question= data[3]
+                                question= question[1:]
+                                msg='givenhint-'+ self.History_Hints[question]
+                                clientsock.send(msg)
+
+                            except:
+                                 print ("hint problem")
+                            
+                        else :
                             msg='No hints given'
                             print (msg)
                             clientsock.send(msg)
                     
                     elif 'time-end-error' == data:
                         
-                        msg='bye'
-                        clientsock.send(msg)
-                        print "I had to end communication with ",addr
-                        break
+                        if self.auto_shut == True:
+                            msg='bye'
+                            clientsock.send(msg)
+                            self.check_exit(clientsock,addr,cursor)
+                            print "He passed the time ",addr
+                            break
+
+                        else:
+                            print ("cant shut down")
+                    
+                    #example: "User_chat_all-Noam-I am ok" /   #example: "User_chat-Noam-I am ok"
+                    elif 'User_chat' in data :
+                        
+                        if self.admin_sock is not None:
+                            self.admin_sock.send( data )
+
+                        #sending all users
+                        if "_all" in data:
+
+                            Name= data.split('-')[1]
+                            msg= data.split('-')[2]
+                            for key, value in self.users_socket.items():
+
+                                if value != "" and key != Name:
+                                    try:
+                                        self.users_socket[key].send( data )
+                                    except Exception as e:
+                                        print(e)
+
+                        
                         
                     else:       
                         
                         level_len=len(self.History_test_1)
-                        data=data.split("-")
+                        data = data.split("-")
                         print (data)
                         subj= data[0]
                         level= data[1]
@@ -381,17 +605,21 @@ class server:
                         ques_index= ques_num+level_num-1
 
                         feedback= self.check_answer(clientsock, question ,ans,ques_index-1, subj)
+                        cursor.execute('''SELECT L_grade,T_grade FROM users WHERE name=?''', (name,))
+                        old_grades = cursor.fetchone() # retrieves the next row
+                        #cursor.close()
+                        level_grade= int(old_grades[0])
+                        total_grade= int(old_grades[1])
+
                         #if feedback is 'Right', adding 2 points and sending the next qusteion right next
                         if feedback== 'Right':
-                            cursor.execute('''SELECT L_grade,T_grade FROM users WHERE name=?''', (name,))
-                            old_grades = cursor.fetchone() # retrieves the next row
-                            level_grade= int(old_grades[0])+ 2
-                            total_grade= int(old_grades[1])+ 2
-                            print 'f-ew---------'
-                            print level_grade
-                            print total_grade
+                            
+                            level_grade= level_grade + 2
+                            total_grade= total_grade + 2
+                            print "Grades L,T--->  {} , {}".format( level_grade, total_grade)
                             cursor.execute('''UPDATE users SET L_grade = ?, T_grade = ?  WHERE name = ? ''',
                             (level_grade,total_grade, name))
+                            #cursor.close()
 
                         if self.can_next:   
 
@@ -412,6 +640,7 @@ class server:
                                 new_history= old_history[0] + ', ' + subj[0] + str(level_num)
                                 cursor.execute('''UPDATE users SET history = ?  WHERE name = ? ''',
                                 (new_history, name))
+                                #cursor.close()
                                 
                                 #changing to the next level
                                 level_num+=1
@@ -444,6 +673,8 @@ class server:
                                 (cur_level ,0, name))
                                 
                                 conn.commit()
+                                #conn.close()
+                                #cursor.close()
 
   
                            
@@ -451,17 +682,19 @@ class server:
                             cursor.execute('''UPDATE users SET current_question =?  WHERE name = ? ''',
                             (cur_ques , name))
 
-                            cursor.execute("SELECT * FROM users") # Fetching data
-                            for row in cursor:
+                            # cursor.execute("SELECT * FROM users") # Fetching data
+                            # for row in cursor:
                                 
-                                msg= " id-> {}, name-> {}, subject-> {}, study_units-> {},current_level-> {}, current_question-> {}, L_grade-> {}, T_grade-> {}, history-> {} ".format( row[0] ,
-                                row[1],row[2],row[3],row[4],row[5], row[6], row[7], row[8] )
+                            #     msg= " id-> {}, name-> {}, subject-> {}, study_units-> {},current_level-> {}, current_question-> {}, L_grade-> {}, T_grade-> {}, history-> {} ".format( row[0] ,
+                            #     row[1],row[2],row[3],row[4],row[5], row[6], row[7], row[8] )
 
-                                print msg
+                            #     print msg
                                 
                             print '-------------------------------------------------------------------'
-                            msg=('{}-{}-{}-{}-{}').format(subj,str(level),ques_num+1,"-".join(question_answers), str(self.Time_to_hint) )
+                            msg=('{}-{}-{}-{}-{}').format(subj,str(level),ques_num+1,"-".join(question_answers), str(self.users_Time_till_hint[name]) )
                             print msg
+                            
+                            
                             clientsock.send(msg)
 
 
@@ -527,7 +760,7 @@ save_free_port()
 
 
 conn = None
-file_name='test2.db'
+file_name='final_test2.db'
 
 conn = lite.connect(file_name)
 conn = lite.connect(file_name, check_same_thread=False)
@@ -537,12 +770,14 @@ cursor = conn.cursor()
 
 try:
     cursor.execute(''' CREATE TABLE users(id INTEGER PRIMARY KEY, name TEXT, subject Text,
-    study_units Text, current_level TEXT, current_question Text, L_grade INTEGER, T_grade INTEGER, history TEXT, password Text ) ''')
+    study_units Text, current_level TEXT, current_question Text, L_grade INTEGER, T_grade INTEGER, history TEXT, password Text, Last_entry Text ) ''')
     print ('new table')
+    
 except:
     print ('table already created')
     
 conn.commit()
+#conn.close()
 
 ser= server(ip,port)
 ser.run()
